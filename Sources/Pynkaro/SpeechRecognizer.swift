@@ -2,8 +2,19 @@ import Foundation
 import AVFoundation
 import Speech
 
-/// Captura o microfone com AVAudioEngine e transcreve continuamente
-/// com SFSpeechRecognizer (on-device quando disponível).
+enum SpeechRecognizerError: LocalizedError {
+    case emptyTranscription
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyTranscription:
+            return "O reconhecimento de fala do macOS não encontrou fala no áudio."
+        }
+    }
+}
+
+/// Escuta continuamente com SFSpeechRecognizer para detectar a wake word.
+/// É encerrado antes da gravação da pergunta (on-device quando disponível).
 final class SpeechRecognizer {
 
     /// Chamado a cada transcrição parcial (texto acumulado da sessão atual).
@@ -60,6 +71,44 @@ final class SpeechRecognizer {
             }
             if let error {
                 self.onError?(error)
+            }
+        }
+    }
+
+    /// Transcreve um arquivo completo pelo Speech framework. Usado quando a
+    /// OpenAI não está configurada ou falha, sem obrigar o usuário a repetir.
+    func transcribeFile(at url: URL,
+                        completion: @escaping (Result<String, Error>) -> Void) {
+        stopListening()
+        generation += 1
+        let gen = generation
+
+        let request = SFSpeechURLRecognitionRequest(url: url)
+        request.shouldReportPartialResults = false
+        if recognizer.supportsOnDeviceRecognition {
+            request.requiresOnDeviceRecognition = true
+        }
+
+        task = recognizer.recognitionTask(with: request) { [weak self] result, error in
+            guard let self, gen == self.generation else { return }
+
+            if let result, result.isFinal {
+                self.generation += 1
+                self.task = nil
+                let text = result.bestTranscription.formattedString
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if text.isEmpty {
+                    completion(.failure(SpeechRecognizerError.emptyTranscription))
+                } else {
+                    completion(.success(text))
+                }
+                return
+            }
+
+            if let error {
+                self.generation += 1
+                self.task = nil
+                completion(.failure(error))
             }
         }
     }

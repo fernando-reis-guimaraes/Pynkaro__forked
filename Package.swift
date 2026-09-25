@@ -28,6 +28,11 @@ let package = Package(
                     "-Xlinker", "Info.plist"
                 ])
             ]
+        ),
+        .testTarget(
+            name: "PynkaroTests",
+            dependencies: ["Pynkaro"],
+            path: "Tests/PynkaroTests"
         )
     ]
 )

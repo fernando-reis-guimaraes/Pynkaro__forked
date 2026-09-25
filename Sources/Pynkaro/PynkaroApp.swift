@@ -45,7 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.pauseItem.title = (status == .paused) ? "Retomar escuta" : "Pausar escuta"
             }
 
-        // Primeira execução sem chave: onboarding. Senão, direto ao trabalho.
+        // Anthropic é obrigatória. OpenAI e ElevenLabs são opcionais.
         if Config.anthropicKey == nil {
             openSettings(onboarding: true)
         } else {
@@ -173,6 +173,7 @@ struct SettingsView: View {
     var onSaved: (() -> Void)?
 
     @State private var anthropicKey = Config.anthropicKey ?? ""
+    @State private var openAIKey = Config.openAIKey ?? ""
     @State private var elevenLabsKey = Config.elevenLabsKey ?? ""
 
     var body: some View {
@@ -180,7 +181,7 @@ struct SettingsView: View {
             if isOnboarding {
                 Text("Bem-vindo ao Pynkaro! 🦊")
                     .font(.title2).bold()
-                Text("Para começar, informe suas chaves de API. Elas ficam guardadas com segurança no Keychain do seu Mac e nunca saem dele.")
+                Text("Para começar, informe a chave da Anthropic. OpenAI e ElevenLabs são opcionais; sem elas, transcrição e voz usam os recursos do macOS.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -197,6 +198,18 @@ struct SettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
+                Text("Chave da OpenAI (opcional)")
+                    .font(.subheadline).bold()
+                TextField("Transcrição e voz OpenAI", text: $openAIKey)
+                Text("Pode ser usada separadamente para transcrição e síntese. A voz OpenAI é gerada por IA.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Link("Criar chave em platform.openai.com",
+                     destination: URL(string: "https://platform.openai.com/api-keys")!)
+                    .font(.caption)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
                 Text("Chave da ElevenLabs (opcional)")
                     .font(.subheadline).bold()
                 TextField("Sem ela, o app usa a voz do sistema", text: $elevenLabsKey)
@@ -206,7 +219,7 @@ struct SettingsView: View {
             }
 
             if !isOnboarding {
-                Text("Mudanças na chave da ElevenLabs valem após reiniciar o app.")
+                Text("As chaves valem na próxima resposta. Provedor, modelo e voz são definidos por variáveis de ambiente e exigem reiniciar o app.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -215,11 +228,12 @@ struct SettingsView: View {
                 Spacer()
                 Button(isOnboarding ? "Salvar e começar" : "Salvar") {
                     Config.setAnthropicKey(anthropicKey)
+                    Config.setOpenAIKey(openAIKey)
                     Config.setElevenLabsKey(elevenLabsKey)
                     onSaved?()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(anthropicKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(anthropicKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .textFieldStyle(.roundedBorder)
